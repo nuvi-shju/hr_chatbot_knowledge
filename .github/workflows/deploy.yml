@@ -1,0 +1,113 @@
+
+
+name: Deploy Cloud Run Job (Exporter)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Dockerfile'
+      - 'scripts/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch: {}
+
+env:
+  REGION: ${{ vars.GCP_REGION }}            # e.g. asia-northeast3
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}    # chatgpt-hr-461008
+  REPO: ${{ vars.AR_REPO }}                 # e.g. hr-knowledge
+  IMAGE: ${{ vars.IMAGE_NAME }}             # e.g. hr-knowledge-exporter
+  JOB_NAME: ${{ vars.JOB_NAME }}            # e.g. hr-knowledge-exporter
+  NOTION_VERSION: '2022-06-28'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write   # for Workload Identity Federation
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: 'access_token'
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build image
+        run: |
+          IMAGE_URI="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }}"
+          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
+          docker build -t "$IMAGE_URI" .
+
+      - name: Push image
+        run: |
+          docker push "$IMAGE_URI"
+
+      - name: Ensure Secret Manager entries exist (noop if already present)
+        run: |
+          # Create or update secrets from GitHub Secrets (optional convenience)
+          # If you prefer managing secrets only in GCP, remove this step.
+          set -euo pipefail
+          create_or_update_secret() {
+            local name=$1; local value=$2
+            if gcloud secrets describe "$name" --project "${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+              echo -n "$value" | gcloud secrets versions add "$name" --data-file=- --project "${{ env.PROJECT_ID }}"
+            else
+              echo -n "$value" | gcloud secrets create "$name" --data-file=- --replication-policy=automatic --project "${{ env.PROJECT_ID }}"
+            fi
+          }
+          if [ -n "${{ secrets.NOTION_API_KEY }}" ]; then
+            create_or_update_secret NOTION_API_KEY "${{ secrets.NOTION_API_KEY }}"
+          fi
+          if [ -n "${{ secrets.NOTION_DATABASE_ID }}" ]; then
+            create_or_update_secret NOTION_DATABASE_ID "${{ secrets.NOTION_DATABASE_ID }}"
+          fi
+
+      - name: Create or Update Cloud Run Job
+        run: |
+          set -euo pipefail
+          IMAGE_URI=${IMAGE_URI}
+          PROJECT_ID=${{ env.PROJECT_ID }}
+          REGION=${{ env.REGION }}
+          JOB=${{ env.JOB_NAME }}
+
+          if gcloud run jobs describe "$JOB" --region "$REGION" --project "$PROJECT_ID" >/dev/null 2>&1; then
+            gcloud run jobs update "$JOB" \
+              --image="$IMAGE_URI" \
+              --region="$REGION" \
+              --project="$PROJECT_ID" \
+              --set-env-vars=OUTPUT_DIR=/app,NOTION_VERSION=${{ env.NOTION_VERSION }} \
+              --set-secrets=NOTION_API_KEY=projects/${PROJECT_ID}/secrets/NOTION_API_KEY:latest,NOTION_DATABASE_ID=projects/${PROJECT_ID}/secrets/NOTION_DATABASE_ID:latest \
+              --cpu=1 --memory=512Mi \
+              --max-retries=1 \
+              --task-timeout=900s
+          else
+            gcloud run jobs create "$JOB" \
+              --image="$IMAGE_URI" \
+              --region="$REGION" \
+              --project="$PROJECT_ID" \
+              --set-env-vars=OUTPUT_DIR=/app,NOTION_VERSION=${{ env.NOTION_VERSION }} \
+              --set-secrets=NOTION_API_KEY=projects/${PROJECT_ID}/secrets/NOTION_API_KEY:latest,NOTION_DATABASE_ID=projects/${PROJECT_ID}/secrets/NOTION_DATABASE_ID:latest \
+              --cpu=1 --memory=512Mi \
+              --max-retries=1 \
+              --task-timeout=900s
+          fi
+
+      - name: (Optional) Execute Job now
+        if: ${{ github.event_name != 'pull_request' }}
+        run: |
+          gcloud run jobs execute ${{ env.JOB_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }}
