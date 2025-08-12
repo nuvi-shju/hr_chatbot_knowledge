@@ -1,0 +1,50 @@
+
+
+name: Publish Knowledge Base to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'knowledge_base/**/*.md'
+      - '.github/workflows/publish-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-publish
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare site directory and copy markdown files
+        run: |
+          mkdir -p _site/knowledge_base
+          find knowledge_base -maxdepth 1 -name '*.md' -exec cp {} _site/knowledge_base/ \;
+          cd _site/knowledge_base
+          echo "<html><body><h1>Knowledge Base Index</h1><ul>" > index.html
+          for f in *.md; do
+            [ "$f" = "index.md" ] && continue
+            name=$(basename "$f" .md)
+            echo "<li><a href=\"$f\">$name</a></li>" >> index.html
+          done
+          echo "</ul></body></html>" >> index.html
+          cd ../../
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
