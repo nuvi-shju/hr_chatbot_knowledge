@@ -8,13 +8,34 @@ class AssistantClient:
         self.assistant_id = settings.ASSISTANT_ID
 
     def ask(self, question: str) -> str:
-        response = self.client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "user", "content": question}
-            ],
+        thread = self.client.beta.threads.create()
+
+        self.client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=question
         )
-        return response.choices[0].message.content.strip()
+
+        run = self.client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id=self.assistant_id,
+        )
+
+        while True:
+            run_status = self.client.beta.threads.runs.retrieve(
+                thread_id=thread.id,
+                run_id=run.id
+            )
+            if run_status.status in ["completed", "failed", "cancelled"]:
+                break
+
+        if run_status.status != "completed":
+            raise RuntimeError(f"Run failed with status: {run_status.status}")
+
+        messages = self.client.beta.threads.messages.list(thread_id=thread.id)
+        last_message = messages.data[0]
+
+        return last_message.content[0].text.value
 
     def send_message(self, user_input: str) -> str:
         # Create a new thread
