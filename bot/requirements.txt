@@ -1,0 +1,6 @@
+Flask==3.0.3
+gunicorn==22.0.0
+slack_bolt==1.18.1
+slack_sdk==3.27.1
+openai==1.40.0
+requests==2.32.3

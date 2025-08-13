@@ -1,0 +1,109 @@
+name: Deploy Slack Bot to Cloud Run
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "bot/**"
+      - ".github/workflows/bot-deploy.yml"
+  workflow_dispatch: {}
+
+env:
+  REGION: ${{ vars.GCP_REGION }}                # 예: asia-northeast3 (Seoul)
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}        # 예: chatgpt-hr-461008
+  AR_REPO: ${{ vars.AR_REPO }}                  # 예: hr-knowledge
+  SERVICE_NAME: ${{ vars.SERVICE_NAME }}        # 예: hr-kb-bot
+  IMAGE_NAME: ${{ vars.IMAGE_NAME }}            # 예: hr-kb-bot
+  CONCURRENCY: "80"                             # 동시 처리(적절히 조정)
+  CPU: "1"                                      # vCPU
+  MEMORY: "512Mi"                               # 메모리
+  TIMEOUT: "60s"                                # 요청 타임아웃
+  MIN_INSTANCES: "0"                            # 무부하시 0으로 축소(비용↓)
+  MAX_INSTANCES: "5"                            # 상한
+
+permissions:
+  id-token: write   # Workload Identity Federation
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- Auth (Workload Identity Federation 권장) ---
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: access_token
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # --- Build & Push ---
+      - name: Build container image
+        run: |
+          IMAGE_URI="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+          docker build -t "$IMAGE_URI" ./bot
+
+      - name: Push image
+        run: docker push "$IMAGE_URI"
+
+      # --- (Optional) Secret Manager 동기화 (없으면 건너뜀) ---
+      - name: Ensure Secret Manager entries exist
+        run: |
+          set -euo pipefail
+          create_or_update_secret () {
+            local NAME=$1; local VALUE=$2
+            if [ -z "$VALUE" ]; then echo "Skip $NAME (empty)"; return 0; fi
+            if gcloud secrets describe "$NAME" --project "${{ env.PROJECT_ID }}" >/dev/null 2>&1; then
+              echo -n "$VALUE" | gcloud secrets versions add "$NAME" --data-file=- --project "${{ env.PROJECT_ID }}"
+            else
+              echo -n "$VALUE" | gcloud secrets create "$NAME" --data-file=- --replication-policy=automatic --project "${{ env.PROJECT_ID }}"
+            fi
+          }
+          create_or_update_secret OPENAI_API_KEY "${{ secrets.OPENAI_API_KEY }}"
+          create_or_update_secret SLACK_BOT_TOKEN "${{ secrets.SLACK_BOT_TOKEN }}"
+          create_or_update_secret SLACK_SIGNING_SECRET "${{ secrets.SLACK_SIGNING_SECRET }}"
+          create_or_update_secret ASSISTANT_ID "${{ secrets.ASSISTANT_ID }}"
+
+      # --- Deploy to Cloud Run ---
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${IMAGE_URI}"
+          gcloud run deploy "${{ env.SERVICE_NAME }}" \
+            --image="${IMAGE_URI}" \
+            --project="${{ env.PROJECT_ID }}" \
+            --region="${{ env.REGION }}" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --port=8080 \
+            --concurrency="${{ env.CONCURRENCY }}" \
+            --cpu="${{ env.CPU }}" \
+            --memory="${{ env.MEMORY }}" \
+            --timeout="${{ env.TIMEOUT }}" \
+            --min-instances="${{ env.MIN_INSTANCES }}" \
+            --max-instances="${{ env.MAX_INSTANCES }}" \
+            --set-env-vars="TZ=Asia/Seoul" \
+            --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest,SLACK_BOT_TOKEN=SLACK_BOT_TOKEN:latest,SLACK_SIGNING_SECRET=SLACK_SIGNING_SECRET:latest,ASSISTANT_ID=ASSISTANT_ID:latest"
+
+          # 서비스 URL 출력
+          URL=$(gcloud run services describe "${{ env.SERVICE_NAME }}" --region "${{ env.REGION }}" --project "${{ env.PROJECT_ID }}" --format="value(status.url)")
+          echo "SERVICE_URL=$URL" >> $GITHUB_OUTPUT
+
+      - name: Show Cloud Run URL (use for Slack Request URL)
+        run: |
+          echo "Cloud Run URL: ${{ steps.deploy.outputs.SERVICE_URL }}"
+          echo "Slack Event Request URL should be: ${{ steps.deploy.outputs.SERVICE_URL }}/slack/events"
