@@ -24,35 +24,27 @@ def register_routes(app: App):
     def on_slash(ack, command, client, logger):
         ack()
         q = command.get("text", "").strip()
-        client.chat_postMessage(
-            channel=command["channel_id"],
-            text=q
-        )
-        try:
-            if not q:
-                client.chat_postMessage(
-                    channel=command["channel_id"],
-                    text="무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘"
-                )
-                return
-
-            answer = assistant.send_message(q)
-
-            channel_id = command["channel_id"]
-            thread_ts = command.get("thread_ts") or command.get("message_ts") or command.get("ts")
-
-            kwargs = {
-                "channel": channel_id,
-                "text": answer,
-            }
-            if thread_ts:
-                kwargs["thread_ts"] = thread_ts
-
-            client.chat_postMessage(**kwargs)
-
-        except Exception as e:
-            logger.error(f"Failed to run listener function (error: {e})")
+        if not q:
             client.chat_postMessage(
                 channel=command["channel_id"],
-                text=f"❌ 오류가 발생해 */누비봇*에 실패했습니다.\n```\n{e}\n```"
+                text="무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘"
             )
+            return
+
+        thread_ts = command.get("thread_ts") or command.get("message_ts") or command.get("ts")
+
+        # 질문 내용을 먼저 스레드의 시작점으로 기록
+        posted = client.chat_postMessage(
+            channel=command["channel_id"],
+            text=":question: " + q
+        )
+        thread_ts = posted["ts"]
+
+        # GPT 응답 생성
+        answer = assistant.send_message(q)
+
+        client.chat_postMessage(
+            channel=command["channel_id"],
+            text=f"{answer}\n\n<@{command['user_id']}>",
+            thread_ts=thread_ts
+        )
