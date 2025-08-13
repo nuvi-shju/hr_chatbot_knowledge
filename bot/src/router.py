@@ -35,7 +35,7 @@ def register_routes(app: App):
         # 질문 내용을 먼저 스레드의 시작점으로 기록
         posted = client.chat_postMessage(
             channel=command["channel_id"],
-            text=":question: " + q
+            text=f"<@{command['user_id']}> 님의 질문: {q}"
         )
         thread_ts = posted["ts"]
 
@@ -44,6 +44,6 @@ def register_routes(app: App):
 
         client.chat_postMessage(
             channel=command["channel_id"],
-            text=f"{answer}\n\n<@{command['user_id']}>",
+            text=answer,
             thread_ts=thread_ts
         )
