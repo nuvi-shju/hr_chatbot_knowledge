@@ -21,14 +21,26 @@ def register_routes(app: App):
             say(f"에러가 발생했습니다: {e}")
 
     @app.command("/누비봇")
-    def on_slash(ack, respond, command):
+    def on_slash(ack, client, command):
         ack()
         q = (command.get("text") or "").strip()
         if not q:
-            respond("사용법: `/누비봇 질문내용`")
+            client.chat_postMessage(
+                channel=command["channel_id"],
+                thread_ts=command.get("thread_ts") or command["ts"],
+                text="사용법: `/누비봇 질문내용`"
+            )
             return
         try:
             answer = assistant.ask(q)
-            respond(answer)
+            client.chat_postMessage(
+                channel=command["channel_id"],
+                thread_ts=command.get("thread_ts") or command["ts"],
+                text=answer
+            )
         except Exception as e:
-            respond(f"에러가 발생했습니다: {e}")
+            client.chat_postMessage(
+                channel=command["channel_id"],
+                thread_ts=command.get("thread_ts") or command["ts"],
+                text=f"에러가 발생했습니다: {e}"
+            )
