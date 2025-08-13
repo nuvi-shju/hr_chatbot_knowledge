@@ -26,7 +26,7 @@ def register_routes(app: App):
         q = command.get("text", "").strip()
         client.chat_postMessage(
             channel=command["channel_id"],
-            text=f":question: {q}"
+            text=q
         )
         try:
             if not q:
@@ -36,7 +36,7 @@ def register_routes(app: App):
                 )
                 return
 
-            answer = assistant.ask(q, use_context=True)
+            answer = assistant.send_message(q)
 
             channel_id = command["channel_id"]
             thread_ts = command.get("thread_ts") or command.get("message_ts") or command.get("ts")
