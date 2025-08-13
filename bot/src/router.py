@@ -20,12 +20,12 @@ def register_routes(app: App):
         except Exception as e:
             say(f"에러가 발생했습니다: {e}")
 
-    @app.command("/kb")
+    @app.command("/누비봇")
     def on_slash(ack, respond, command):
         ack()
         q = (command.get("text") or "").strip()
         if not q:
-            respond("사용법: `/kb 질문내용`")
+            respond("사용법: `/누비봇 질문내용`")
             return
         try:
             answer = assistant.ask(q)
