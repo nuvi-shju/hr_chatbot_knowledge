@@ -23,8 +23,13 @@ def register_routes(app: App):
                 say("무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘")
                 return
 
-        thread_ts = body.get("event", {}).get("ts") if channel_type != "im" else None
-        say(":hourglass_flowing_sand: 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!", thread_ts=thread_ts)
+        if channel_type == "im":
+            say(":hourglass_flowing_sand: 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!")
+        else:
+            thread_ts = body.get("event", {}).get("ts")
+            say(":hourglass_flowing_sand: 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!", thread_ts=thread_ts)
+
+        thread_ts = None if channel_type == "im" else body.get("event", {}).get("ts")
 
         event_ts = body.get("event", {}).get("event_ts")
         client_msg_id = body.get("event", {}).get("client_msg_id")
