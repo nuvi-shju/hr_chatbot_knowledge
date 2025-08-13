@@ -19,13 +19,13 @@ def register_routes(app: App):
         try:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(assistant.ask, q)
-                done, not_done = wait([future], timeout=10, return_when=FIRST_COMPLETED)
+                done, not_done = wait([future], timeout=5, return_when=FIRST_COMPLETED)
 
                 if future in done:
                     answer = future.result()
                     say(answer, thread_ts=thread_ts)
                 else:
-                    say("_질문 이해 중…_", thread_ts=thread_ts)
+                    say("_⏳ 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!_", thread_ts=thread_ts)
                     answer = future.result()
                     say(answer, thread_ts=thread_ts)
         except Exception as e:
