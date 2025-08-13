@@ -25,10 +25,13 @@ def register_routes(app: App):
         ack(response_type="in_channel")
 
         try:
-            q = command["text"]
+            q = command.get("text", "").strip()
+            if not q:
+                say("무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘")
+                return
             answer = assistant.ask(q)
 
-            thread_ts = command.get("thread_ts")
+            thread_ts = command.get("thread_ts") or command.get("message_ts") or command.get("ts")
             if thread_ts:
                 say(text=answer, thread_ts=thread_ts)
             else:
