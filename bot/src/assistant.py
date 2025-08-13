@@ -7,6 +7,15 @@ class AssistantClient:
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.assistant_id = settings.ASSISTANT_ID
 
+    def ask(self, question: str) -> str:
+        response = self.client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "user", "content": question}
+            ],
+        )
+        return response.choices[0].message.content.strip()
+
     def send_message(self, user_input: str) -> str:
         # Create a new thread
         thread = self.client.beta.threads.create()
