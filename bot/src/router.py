@@ -21,22 +21,34 @@ def register_routes(app: App):
             say(f"에러가 발생했습니다: {e}")
 
     @app.command("/누비봇")
-    def on_slash(ack, command, say, logger):
-        ack(response_type="in_channel")
-
+    def on_slash(ack, command, client, logger):
+        ack()
         try:
             q = command.get("text", "").strip()
             if not q:
-                say("무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘")
+                client.chat_postMessage(
+                    channel=command["channel_id"],
+                    text="무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘"
+                )
                 return
+
             answer = assistant.ask(q)
 
+            channel_id = command["channel_id"]
             thread_ts = command.get("thread_ts") or command.get("message_ts") or command.get("ts")
+
+            kwargs = {
+                "channel": channel_id,
+                "text": answer,
+            }
             if thread_ts:
-                say(text=answer, thread_ts=thread_ts)
-            else:
-                say(text=answer)
+                kwargs["thread_ts"] = thread_ts
+
+            client.chat_postMessage(**kwargs)
 
         except Exception as e:
             logger.error(f"Failed to run listener function (error: {e})")
-            say(text=f"{{{e}}} 오류가 발생해 */누비봇*에 실패했습니다.")
+            client.chat_postMessage(
+                channel=command["channel_id"],
+                text=f"❌ 오류가 발생해 */누비봇*에 실패했습니다.\n```\n{e}\n```"
+            )
