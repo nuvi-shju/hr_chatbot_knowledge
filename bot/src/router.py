@@ -22,7 +22,7 @@ def register_routes(app: App):
 
     @app.command("/누비봇")
     def on_slash(ack, command, say, logger):
-        ack()
+        ack(response_type="in_channel")
 
         try:
             q = command["text"]
@@ -36,4 +36,4 @@ def register_routes(app: App):
 
         except Exception as e:
             logger.error(f"Failed to run listener function (error: {e})")
-            say(text=f"❌ 오류가 발생해 답변에 실패했습니다.\n```\n{e}\n```")
+            say(text=f"{{{e}}} 오류가 발생해 */누비봇*에 실패했습니다.")
