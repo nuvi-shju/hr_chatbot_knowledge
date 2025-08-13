@@ -13,12 +13,13 @@ def register_routes(app: App):
         if not q:
             say("무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘")
             return
-        say("_질문 이해 중…_")
+        thread_ts = body.get("event", {}).get("ts")
+        say("_질문 이해 중…_", thread_ts=thread_ts)
         try:
             answer = assistant.ask(q)
-            say(answer)
+            say(answer, thread_ts=thread_ts)
         except Exception as e:
-            say(f"에러가 발생했습니다: {e}")
+            say(f"에러가 발생했습니다: {e}", thread_ts=thread_ts)
 
     @app.command("/누비봇")
     def on_slash(ack, command, client, logger):
