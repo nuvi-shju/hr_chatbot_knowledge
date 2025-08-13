@@ -23,8 +23,12 @@ def register_routes(app: App):
     @app.command("/누비봇")
     def on_slash(ack, command, client, logger):
         ack()
+        q = command.get("text", "").strip()
+        client.chat_postMessage(
+            channel=command["channel_id"],
+            text=f":question: {q}"
+        )
         try:
-            q = command.get("text", "").strip()
             if not q:
                 client.chat_postMessage(
                     channel=command["channel_id"],
@@ -32,7 +36,7 @@ def register_routes(app: App):
                 )
                 return
 
-            answer = assistant.ask(q)
+            answer = assistant.ask(q, use_context=True)
 
             channel_id = command["channel_id"]
             thread_ts = command.get("thread_ts") or command.get("message_ts") or command.get("ts")
