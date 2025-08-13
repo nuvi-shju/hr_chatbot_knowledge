@@ -17,7 +17,7 @@ register_routes(bolt_app)
 app = Flask(__name__)
 handler = SlackRequestHandler(bolt_app)
 
-@flask_app.post("/slack/events")
+@app.post("/slack/events")
 def slack_events():
     # --- Slack URL verification fast-path ---
     data = request.get_json(silent=True) or {}
@@ -27,7 +27,7 @@ def slack_events():
      # 나머지는 Bolt에 위임
     return handler.handle(request)
 
-@flask_app.get("/healthz")
+@app.get("/healthz")
 def healthz():
     return make_response("ok", 200)
 
