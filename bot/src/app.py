@@ -14,7 +14,7 @@ bolt_app = SlackBoltApp(
 register_routes(bolt_app)
 
 # Flask 래핑 (Cloud Run 등에서 사용)
-flask_app = Flask(__name__)
+app = Flask(__name__)
 handler = SlackRequestHandler(bolt_app)
 
 @flask_app.post("/slack/events")
@@ -32,4 +32,4 @@ def healthz():
     return make_response("ok", 200)
 
 if __name__ == "__main__":
-    flask_app.run(host="0.0.0.0", port=settings.PORT)
+    app.run(host="0.0.0.0", port=settings.PORT)
