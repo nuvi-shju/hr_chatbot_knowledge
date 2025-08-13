@@ -101,6 +101,7 @@ jobs:
             --platform=managed \
             --allow-unauthenticated \
             --port=8080 \
+            --service-account="nuvibot@chatgpt-hr-461008.iam.gserviceaccount.com" \
             --cpu="${{ env.CPU }}" \
             --memory="${{ env.MEMORY }}" \
             --timeout="${{ env.TIMEOUT }}" \
