@@ -118,6 +118,6 @@ jobs:
           echo "SERVICE_URL=$URL" >> $GITHUB_OUTPUT
 
       - name: Show Cloud Run URL
-        run: 
+        run: |
           echo "Cloud Run URL: ${{ steps.deploy.outputs.SERVICE_URL }}"
           echo "Slack Request URL should be: ${{ steps.deploy.outputs.SERVICE_URL }}/slack/events"
