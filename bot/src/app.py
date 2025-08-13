@@ -19,6 +19,12 @@ handler = SlackRequestHandler(bolt_app)
 
 @flask_app.post("/slack/events")
 def slack_events():
+    # --- Slack URL verification fast-path ---
+    data = request.get_json(silent=True) or {}
+    if data.get("type") == "url_verification":
+        # Slack은 plain text 또는 {"challenge": "..."} 모두 허용
+        return make_response(data.get("challenge", ""), 200, {"Content-Type": "text/plain"})
+     # 나머지는 Bolt에 위임
     return handler.handle(request)
 
 @flask_app.get("/healthz")
