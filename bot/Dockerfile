@@ -13,4 +13,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 
 # gunicorn으로 Flask 앱 실행
-CMD ["gunicorn", "-w", "2", "-b", ":8080", "src.app:flask_app"]
+CMD ["gunicorn", "-w", "2", "-b", ":8080", "src.app:app"]
