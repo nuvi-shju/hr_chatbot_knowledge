@@ -1,5 +1,7 @@
 from slack_bolt import App
 from .assistant import AssistantClient
+import concurrent.futures
+from concurrent.futures import wait, FIRST_COMPLETED
 
 assistant = AssistantClient()
 
@@ -14,10 +16,18 @@ def register_routes(app: App):
             say("무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘")
             return
         thread_ts = body.get("event", {}).get("ts")
-        say("_질문 이해 중…_", thread_ts=thread_ts)
         try:
-            answer = assistant.ask(q)
-            say(answer, thread_ts=thread_ts)
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(assistant.ask, q)
+                done, not_done = wait([future], timeout=10, return_when=FIRST_COMPLETED)
+
+                if future in done:
+                    answer = future.result()
+                    say(answer, thread_ts=thread_ts)
+                else:
+                    say("_질문 이해 중…_", thread_ts=thread_ts)
+                    answer = future.result()
+                    say(answer, thread_ts=thread_ts)
         except Exception as e:
             say(f"에러가 발생했습니다: {e}", thread_ts=thread_ts)
 
