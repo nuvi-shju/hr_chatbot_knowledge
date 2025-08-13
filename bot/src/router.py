@@ -22,7 +22,6 @@ def register_routes(app: App):
 
     @app.command("/누비봇")
     def on_slash(ack, command, client, logger):
-        ack()
         q = command.get("text", "").strip()
         if not q:
             client.chat_postMessage(
