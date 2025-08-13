@@ -60,17 +60,37 @@ def register_routes(app: App):
         )
         thread_ts = posted["ts"]
 
-        # GPT 응답 생성
-        try:
-            answer = assistant.send_message(q)
+        # GPT 응답 생성 (타임아웃 보호)
+        import threading
+
+        answer_container = {}
+
+        def fetch_answer():
+            try:
+                answer = assistant.send_message(q)
+                answer_container["text"] = answer
+            except Exception as e:
+                answer_container["error"] = str(e)
+
+        t = threading.Thread(target=fetch_answer)
+        t.start()
+        t.join(timeout=30)
+
+        if "text" in answer_container:
             client.chat_postMessage(
                 channel=command["channel_id"],
-                text=answer,
+                text=answer_container["text"],
                 thread_ts=thread_ts
             )
-        except Exception as e:
+        elif "error" in answer_container:
             client.chat_postMessage(
                 channel=command["channel_id"],
-                text="응답이 예상보다 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요 🙇",
+                text=f"답변 중 오류가 발생했어요: {answer_container['error']}",
+                thread_ts=thread_ts
+            )
+        else:
+            client.chat_postMessage(
+                channel=command["channel_id"],
+                text="GPT 응답이 예상보다 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요 🙇",
                 thread_ts=thread_ts
             )
