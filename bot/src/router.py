@@ -16,18 +16,29 @@ def register_routes(app: App):
             say("무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘")
             return
         thread_ts = body.get("event", {}).get("ts")
+        event_ts = body.get("event", {}).get("event_ts")
+        client_msg_id = body.get("event", {}).get("client_msg_id")
+        cache_key = f"{event_ts}_{client_msg_id}"
+        if hasattr(app, "seen_messages") and cache_key in app.seen_messages:
+            return
+        if not hasattr(app, "seen_messages"):
+            app.seen_messages = set()
+        app.seen_messages.add(cache_key)
         try:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(assistant.ask, q)
-                done, not_done = wait([future], timeout=5, return_when=FIRST_COMPLETED)
+                done, not_done = wait([future], timeout=2, return_when=FIRST_COMPLETED)
 
+                replied = False
                 if future in done:
                     answer = future.result()
                 else:
                     say("_⏳ 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!_", thread_ts=thread_ts)
+                    replied = True
                     answer = future.result()
 
-                say(answer, thread_ts=thread_ts)
+                if not replied:
+                    say(answer, thread_ts=thread_ts)
         except Exception as e:
             say(f"에러가 발생했습니다: {e}", thread_ts=thread_ts)
 
