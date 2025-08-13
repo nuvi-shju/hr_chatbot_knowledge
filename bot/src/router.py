@@ -16,6 +16,7 @@ def register_routes(app: App):
             say("무엇을 도와드릴까요? 예) 연차 반차 규정 알려줘")
             return
         thread_ts = body.get("event", {}).get("ts")
+        say(":hourglass_flowing_sand: 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!", thread_ts=thread_ts)
         event_ts = body.get("event", {}).get("event_ts")
         client_msg_id = body.get("event", {}).get("client_msg_id")
         cache_key = f"{event_ts}_{client_msg_id}"
@@ -29,16 +30,9 @@ def register_routes(app: App):
                 future = executor.submit(assistant.ask, q)
                 done, not_done = wait([future], timeout=2, return_when=FIRST_COMPLETED)
 
-                replied = False
-                if future in done:
-                    answer = future.result()
-                else:
-                    say("_⏳ 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!_", thread_ts=thread_ts)
-                    replied = True
-                    answer = future.result()
+                answer = future.result()
 
-                if not replied:
-                    say(answer, thread_ts=thread_ts)
+                say(answer, thread_ts=thread_ts)
         except Exception as e:
             say(f"에러가 발생했습니다: {e}", thread_ts=thread_ts)
 
@@ -59,13 +53,24 @@ def register_routes(app: App):
             channel=command["channel_id"],
             text=f"<@{command['user_id']}> 님의 질문: {q}"
         )
+        client.chat_postMessage(
+            channel=command["channel_id"],
+            text=":hourglass_flowing_sand: 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!",
+            thread_ts=posted["ts"]
+        )
         thread_ts = posted["ts"]
 
         # GPT 응답 생성
-        answer = assistant.send_message(q)
-
-        client.chat_postMessage(
-            channel=command["channel_id"],
-            text=answer,
-            thread_ts=thread_ts
-        )
+        try:
+            answer = assistant.send_message(q)
+            client.chat_postMessage(
+                channel=command["channel_id"],
+                text=answer,
+                thread_ts=thread_ts
+            )
+        except Exception as e:
+            client.chat_postMessage(
+                channel=command["channel_id"],
+                text="응답이 예상보다 오래 걸리고 있어요. 잠시 후 다시 시도해 주세요 🙇",
+                thread_ts=thread_ts
+            )
