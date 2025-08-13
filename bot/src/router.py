@@ -23,11 +23,11 @@ def register_routes(app: App):
 
                 if future in done:
                     answer = future.result()
-                    say(answer, thread_ts=thread_ts)
                 else:
                     say("_⏳ 신중하게 답변하기 위해 고민 중이에요… 조금만 기다려 주세요!_", thread_ts=thread_ts)
                     answer = future.result()
-                    say(answer, thread_ts=thread_ts)
+
+                say(answer, thread_ts=thread_ts)
         except Exception as e:
             say(f"에러가 발생했습니다: {e}", thread_ts=thread_ts)
 
