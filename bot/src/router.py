@@ -89,3 +89,28 @@ def register_routes(app: App):
                     say(":warning: GPT 응답이 지연되고 있어요. 다시 시도해 주세요!")
         except Exception as e:
             say(f"에러가 발생했습니다: {e}")
+
+    @app.event("app_home_opened")
+    def update_home_tab(body, client):
+        user_id = body["event"]["user"]
+        try:
+            client.views_publish(
+                user_id=user_id,
+                view={
+                    "type": "home",
+                    "blocks": [
+                        {"type": "section", "text": {"type": "mrkdwn", "text": "*👋 누비봇 사용법 안내*"}},
+                        {"type": "section", "text": {
+                            "type": "mrkdwn",
+                            "text": (
+                                "누비봇은 누비랩 공식 문서를 기반으로 구성원의 질문에 답해주는 지식봇이에요.\n\n"
+                                "*📌 질문은 이렇게!* \n• `@누비봇` 멘션과 함께 질문\n• 누비봇과 1:1 대화창에서 질문\n\n"
+                                "*📚 답변 방식*\n• 내부 문서 기반으로만 답변\n• 문서에 없으면 #tribe-cng-general 채널 추천\n\n"
+                                "*❗ 제한사항*\n• 외부 정보/사적인 질문엔 답변하지 않아요."
+                            )
+                        }}
+                    ]
+                }
+            )
+        except Exception as e:
+            print(f"Error publishing home tab: {e}")
