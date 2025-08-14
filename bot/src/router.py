@@ -48,7 +48,7 @@ def register_routes(app: App):
                 done, _ = wait([future], timeout=60, return_when=FIRST_COMPLETED)
                 if future in done:
                     answer = future.result()
-                    say(answer, thread_ts=thread_ts)
+                    say(blocks=[{"type": "section", "text": {"type": "mrkdwn", "text": answer}}], thread_ts=thread_ts)
                 else:
                     say(":warning: GPT 응답이 지연되고 있어요. 다시 시도해 주세요!", thread_ts=thread_ts)
         except Exception as e:
@@ -84,7 +84,7 @@ def register_routes(app: App):
                 done, _ = wait([future], timeout=60, return_when=FIRST_COMPLETED)
                 if future in done:
                     answer = future.result()
-                    say(answer)
+                    say(blocks=[{"type": "section", "text": {"type": "mrkdwn", "text": answer}}])
                 else:
                     say(":warning: GPT 응답이 지연되고 있어요. 다시 시도해 주세요!")
         except Exception as e:
