@@ -11,6 +11,8 @@ def register_routes(app: App):
         text = body.get("event", {}).get("text", "")
         import re
         channel_type = body.get("event", {}).get("channel_type")
+        if channel_type == "im":
+            return  # Prevent duplicate handling in DM
 
         if channel_type == "im" and not text.startswith("<@"):
             q = text.strip()
